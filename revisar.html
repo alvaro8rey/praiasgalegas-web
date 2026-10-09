@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Revisar reseña — Praias Galegas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap">
+<link rel="icon" type="image/png" href="img/favicon-32.png">
+<style>
+  :root{--cream:#F6F1E7;--white:#fff;--ink:#1A1A1A;--ink-soft:#5B5650;--ocean:#0D73BF;--ocean-dark:#095A97;--sea:#269966;--gold:#E0A21B;--danger:#C0392B;--line:#E7DFCF}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:'Work Sans',sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:28px 18px 60px}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:18px;margin-bottom:22px}
+  .brand img{width:26px;height:26px;border-radius:7px}
+  h1{font-family:'Fredoka',sans-serif;font-size:26px;margin:0 0 4px}
+  .where{color:var(--ink-soft);margin:0 0 14px}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
+  .stars{font-size:24px;color:var(--gold);letter-spacing:2px}
+  .meta{font-size:13px;color:var(--ink-soft);margin-top:4px}
+  .body{background:var(--cream);border-radius:12px;padding:12px 14px;margin:12px 0 0;white-space:pre-wrap;word-wrap:break-word}
+  .empty{color:var(--ink-soft);font-style:italic}
+  .badge{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;margin-left:8px;background:#FDECEA;color:var(--danger)}
+  h2{font-family:'Fredoka',sans-serif;font-size:18px;margin:0 0 4px;color:var(--ocean-dark)}
+  .hint{font-size:13.5px;color:var(--ink-soft);margin:0 0 14px}
+  .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .photo{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--white)}
+  .photo img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#ddd}
+  .photo .row{padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+  .state{font-size:12.5px;font-weight:600}
+  .state.on{color:var(--sea)} .state.off{color:var(--ink-soft)}
+  button{font-family:inherit;font-size:14px;font-weight:600;border:0;border-radius:999px;padding:9px 16px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .btn-main{background:var(--ocean);color:#fff}
+  .btn-ghost{background:#fff;color:var(--ocean-dark);border:1px solid var(--line)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+  .msg{border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:14px}
+  .msg.ok{background:#E8F6EE;color:#1B6B45} .msg.err{background:#FDECEA;color:var(--danger)}
+  .center{text-align:center;padding:50px 10px;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="img/logo.png" alt=""> Praias Galegas · Revisión de reseñas</div>
+  <div id="app"><div class="center">Cargando…</div></div>
+</div>
+
+<script>
+(function () {
+  var API = "https://ziwonliwqrqzulfsgtzu.supabase.co/functions/v1/review-admin";
+  var app = document.getElementById("app");
+
+  // El enlace del correo lleva "#<id de la reseña>.<token>": el fragmento no se envía a ningún servidor.
+  var parts = (location.hash || "").replace(/^#/, "").split(".");
+  var reviewId = parts[0], token = parts[1];
+  // Quita el fragmento de la barra de direcciones/historial tras leerlo
+  if (history.replaceState) history.replaceState(null, "", location.pathname);
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmt(iso) {
+    try { return new Date(iso).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }); }
+    catch (e) { return iso; }
+  }
+
+  async function call(action, extra) {
+    var body = Object.assign({ action: action, review_id: reviewId, token: token }, extra || {});
+    var r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    var data = {};
+    try { data = await r.json(); } catch (e) {}
+    if (!r.ok) { var err = new Error(data.error || ("http_" + r.status)); err.code = data.error; err.status = r.status; throw err; }
+    return data;
+  }
+
+  function showError(e) {
+    var text = "No se pudo completar la operación.";
+    if (e && e.code === "not_found") text = "Esta reseña ya no existe (probablemente fue borrada).";
+    else if (e && (e.code === "forbidden" || e.code === "bad_request")) text = "El enlace no es válido. Abre de nuevo el enlace del correo.";
+    else if (e && e.code === "not_configured") text = "El servidor aún no está configurado (falta ADMIN_LINK_SECRET).";
+    app.innerHTML = '<div class="msg err">' + esc(text) + "</div>";
+  }
+
+  var current = null;
+
+  function render(review, message) {
+    current = review;
+    var photos = review.photos || [];
+    var inGallery = photos.filter(function (p) { return p.in_gallery; }).length;
+    var beach = review.beach ? esc(review.beach.name) + " · " + esc(review.beach.municipality) + " (" + esc(review.beach.province) + ")" : "Playa desconocida";
+    var stars = "★".repeat(review.rating) + "☆".repeat(5 - review.rating);
+
+    var html = "";
+    if (message) html += '<div class="msg ok">' + esc(message) + "</div>";
+    html += '<div class="card">'
+      + "<h1>" + beach + "</h1>"
+      + '<div class="stars">' + stars + "</div>"
+      + '<div class="meta">Publicada ' + esc(fmt(review.created_at))
+      + (review.updated_at && review.updated_at !== review.created_at ? " · editada " + esc(fmt(review.updated_at)) : "")
+      + (review.reports > 0 ? '<span class="badge">' + review.reports + " denuncia" + (review.reports > 1 ? "s" : "") + "</span>" : "")
+      + "</div>"
+      + (review.body ? '<div class="body">' + esc(review.body) + "</div>" : '<div class="body empty">Sin comentario</div>')
+      + "</div>";
+
+    if (photos.length) {
+      html += '<div class="card"><h2>Fotos (' + photos.length + ")</h2>"
+        + '<p class="hint">Las fotos siempre se ven dentro de la reseña. Aquí decides si además aparecen en la <strong>galería de la playa</strong>. '
+        + inGallery + " de " + photos.length + " están ahora en la galería.</p>"
+        + '<div class="photos">';
+      photos.forEach(function (p, i) {
+        html += '<div class="photo"><a href="' + esc(p.url) + '" target="_blank" rel="noopener"><img src="' + esc(p.url) + '" alt="Foto ' + (i + 1) + '"></a>'
+          + '<div class="row"><span class="state ' + (p.in_gallery ? "on" : "off") + '">' + (p.in_gallery ? "● En la galería" : "○ No está en la galería") + "</span>"
+          + '<button class="' + (p.in_gallery ? "btn-ghost" : "btn-main") + '" data-photo="' + i + '">' + (p.in_gallery ? "Quitar de la galería" : "Mostrar en la galería") + "</button></div></div>";
+      });
+      html += "</div>"
+        + '<div class="actions"><button class="btn-main" id="allOn">Mostrar todas en la galería</button>'
+        + '<button class="btn-ghost" id="allOff">Quitar todas de la galería</button></div></div>';
+    }
+
+    html += '<div class="card"><h2>Borrar reseña</h2>'
+      + '<p class="hint">Elimina la reseña (texto, puntuación y votos). '
+      + (inGallery ? "<strong>Ojo:</strong> las fotos que están en la galería seguirán en ella; quítalas antes si no las quieres. " : "")
+      + "Esta acción no se puede deshacer.</p>"
+      + '<button class="btn-danger" id="del">Borrar reseña</button></div>';
+
+    app.innerHTML = html;
+
+    app.querySelectorAll("[data-photo]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var p = photos[Number(btn.getAttribute("data-photo"))];
+        run(btn, function () { return call("set_photo", { photo_url: p.url, show: !p.in_gallery }); },
+          p.in_gallery ? "Foto quitada de la galería." : "Foto añadida a la galería.");
+      });
+    });
+    var on = document.getElementById("allOn"), off = document.getElementById("allOff");
+    if (on) on.addEventListener("click", function () { run(on, function () { return call("set_all_photos", { show: true }); }, "Todas las fotos están en la galería."); });
+    if (off) off.addEventListener("click", function () { run(off, function () { return call("set_all_photos", { show: false }); }, "Ninguna foto está en la galería."); });
+    document.getElementById("del").addEventListener("click", function () {
+      var warn = inGallery ? "\n\nLas fotos que están en la galería se quedarán en ella." : "";
+      if (!confirm("¿Borrar esta reseña definitivamente?" + warn)) return;
+      var b = document.getElementById("del"); b.disabled = true;
+      call("delete").then(function () {
+        app.innerHTML = '<div class="msg ok">Reseña borrada.</div><p class="center">Ya puedes cerrar esta página.</p>';
+      }).catch(function (e) { b.disabled = false; showError(e); });
+    });
+  }
+
+  async function run(btn, fn, okMessage) {
+    btn.disabled = true;
+    try {
+      var data = await fn();
+      render(data.review, okMessage);
+    } catch (e) {
+      btn.disabled = false;
+      var box = document.createElement("div"); box.className = "msg err";
+      box.textContent = "No se pudo completar la operación. Inténtalo de nuevo.";
+      app.insertBefore(box, app.firstChild);
+    }
+  }
+
+  if (!reviewId || !token) {
+    app.innerHTML = '<div class="msg err">Falta el enlace de revisión. Abre la página desde el enlace del correo.</div>';
+    return;
+  }
+  call("get").then(function (d) { render(d.review); }).catch(showError);
+})();
+</script>
+</body>
+</html>
